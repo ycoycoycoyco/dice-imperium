@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dice Imperium</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --tile:#1d2537; --tile-hi:#293349;
+    --line:rgba(205,220,250,.09); --line-strong:rgba(205,220,250,.18);
+    --text:#e9edf5; --muted:#96a1b7; --faint:#67738d;
+    --gold:#e3ba53; --ivory:#f2ead8; --ink:#161a24;
+    --p1:#ff5c4d; --p2:#4da3ff; --p3:#ffc94f; --p4:#4fd08a;
+    --na:#e0785a; --sa:#63b56b; --eu:#6d9df2; --af:#b3ab4c; --as:#bd7ad6; --oc:#48c4bb;
+    --r-sm:6px; --r-md:10px; --r-lg:16px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    padding:16px;
+    background-image:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(110,145,255,.07), transparent),
+      radial-gradient(ellipse 70% 50% at 50% 100%, rgba(227,186,83,.04), transparent);
+  }
+  h1,h2,h3,.serif{font-family:'Fraunces',Georgia,serif;}
+
+  /* ---------- Setup screen ---------- */
+  .setup{max-width:520px; width:100%; padding:48px 40px; background:var(--panel);
+    border:1px solid var(--line); border-radius:var(--r-lg);
+    box-shadow:0 24px 64px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.3);}
+  .setup h1{font-size:2.6rem; font-weight:600; letter-spacing:-.01em; line-height:1.05;}
+  .setup h1 em{color:var(--gold); font-style:italic;}
+  .setup .tag{color:var(--muted); margin:12px 0 32px; font-size:.95rem; line-height:1.55;}
+  .setup label{display:block; font-size:.72rem; font-weight:600; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--faint); margin:24px 0 10px;}
+  .count-row{display:flex; gap:8px;}
+  .count-row button{flex:1; padding:12px; background:var(--tile); color:var(--muted);
+    border:1px solid var(--line); border-radius:var(--r-sm); font:600 1rem 'Inter';
+    cursor:pointer; transition:all .15s;}
+  .count-row button.on{background:var(--gold); color:var(--ink); border-color:var(--gold);}
+  .name-row{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
+  .name-row .dot{width:14px; height:14px; border-radius:50%; flex:none;}
+  .name-row input{flex:1; padding:10px 14px; background:var(--bg); color:var(--text);
+    border:1px solid var(--line); border-radius:var(--r-sm); font:500 .95rem 'Inter'; outline:none;}
+  .name-row input:focus{border-color:var(--line-strong);}
+  .rules{margin-top:28px; padding:16px 18px; background:var(--bg); border-radius:var(--r-md);
+    border:1px solid var(--line); font-size:.85rem; color:var(--muted); line-height:1.6;}
+  .rules b{color:var(--text); font-weight:600;}
+  .big-btn{width:100%; margin-top:28px; padding:16px; background:var(--gold); color:var(--ink);
+    border:none; border-radius:var(--r-md); font:700 1.05rem 'Inter'; letter-spacing:.02em;
+    cursor:pointer; transition:transform .1s, box-shadow .15s;
+    box-shadow:0 4px 16px rgba(217,180,74,.25);}
+  .big-btn:hover{transform:translateY(-1px); box-shadow:0 6px 20px rgba(217,180,74,.35);}
+  .big-btn:active{transform:translateY(0);}
+
+  /* ---------- Board ---------- */
+  #game{display:none;}
+  .board{
+    display:grid; grid-template-columns:1.35fr repeat(6,1fr) 1.35fr;
+    grid-template-rows:1.35fr repeat(6,1fr) 1.35fr;
+    width:min(96vmin,940px); height:min(96vmin,940px);
+    gap:3px; padding:3px; background:var(--line);
+    border-radius:var(--r-lg); overflow:hidden;
+    box-shadow:0 32px 80px rgba(0,0,0,.55);
+  }
+  .tile{background:var(--tile); position:relative; padding:6px 5px; overflow:hidden;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    transition:background .2s; min-width:0;}
+  .tile.here{background:var(--tile-hi); box-shadow:inset 0 0 0 2px var(--gold);}
+  .tile.pickable{cursor:pointer; box-shadow:inset 0 0 0 2px rgba(217,180,74,.45);}
+  .tile.pickable:hover{background:var(--tile-hi); box-shadow:inset 0 0 0 2px var(--gold);}
+  .band{position:absolute; background:var(--bc,transparent);}
+  .b-top .band{top:0; left:0; right:0; height:6px;}
+  .b-bottom .band{bottom:0; left:0; right:0; height:6px;}
+  .b-left .band{left:0; top:0; bottom:0; width:6px;}
+  .b-right .band{right:0; top:0; bottom:0; width:6px;}
+  .t-name{font-size:clamp(.5rem,1.15vmin,.68rem); font-weight:600; letter-spacing:.06em;
+    text-transform:uppercase; text-align:center; line-height:1.25; color:var(--text);}
+  .t-owner{margin-top:4px; font-size:clamp(.55rem,1.2vmin,.72rem); font-weight:700;
+    font-variant-numeric:tabular-nums; padding:2px 9px; border-radius:20px; color:var(--ink);
+    box-shadow:0 2px 5px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.3);}
+  .tile.corner{background:radial-gradient(circle at 50% 38%, #242e44, #1a2132);}
+  .corner .t-name{font-family:'Fraunces',serif; font-size:clamp(.6rem,1.5vmin,.9rem);
+    letter-spacing:.04em; color:var(--gold);}
+  .corner .t-sub{font-size:clamp(.45rem,.95vmin,.6rem); color:var(--faint); text-align:center;
+    margin-top:5px; line-height:1.4; letter-spacing:.03em; max-width:90%;}
+  .tokens{position:absolute; bottom:9px; left:0; right:0; display:flex; gap:3px;
+    justify-content:center;}
+  .b-bottom .tokens{bottom:auto; top:9px;}
+  .tok{width:clamp(8px,1.5vmin,13px); height:clamp(8px,1.5vmin,13px); border-radius:50%;
+    border:2px solid rgba(10,14,22,.6);
+    box-shadow:0 0 0 1.5px rgba(255,255,255,.28), 0 2px 5px rgba(0,0,0,.6);}
+
+  /* ---------- Center ---------- */
+  .center{grid-row:2/8; grid-column:2/8; border-radius:var(--r-md);
+    background:linear-gradient(180deg,#1c2334 0%,#161d2b 100%);
+    border:1px solid var(--line); box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    display:flex; flex-direction:column; padding:clamp(10px,2.4vmin,24px); min-height:0;}
+  .logo{text-align:center;}
+  .logo h1{font-size:clamp(1.2rem,3.4vmin,2.1rem); font-weight:600; letter-spacing:-.01em;}
+  .logo h1 em{color:var(--gold); font-style:italic;}
+  .logo p{font-size:clamp(.5rem,1.1vmin,.68rem); letter-spacing:.22em; text-transform:uppercase;
+    color:var(--faint); margin-top:2px;}
+  .p-row{display:flex; gap:6px; justify-content:center; flex-wrap:wrap;
+    margin:clamp(8px,1.8vmin,16px) 0;}
+  .p-chip{display:flex; align-items:center; gap:7px; padding:5px 10px; background:var(--bg);
+    border:1px solid var(--line); border-radius:20px; font-size:clamp(.55rem,1.2vmin,.75rem);
+    color:var(--muted); font-variant-numeric:tabular-nums;}
+  .p-chip.turn{border-color:var(--line-strong); color:var(--text); background:var(--tile-hi);}
+  .p-chip .dot{width:9px; height:9px; border-radius:50%; flex:none;}
+  .p-chip b{color:var(--text); font-weight:600;}
+  .stage{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:clamp(8px,1.6vmin,14px); min-height:0; text-align:center;}
+  .stage .msg{font-size:clamp(.8rem,1.8vmin,1.05rem); line-height:1.5; max-width:34ch; color:var(--text);}
+  .stage .msg small{display:block; color:var(--muted); font-size:.82em; margin-top:4px;}
+  .btn{padding:12px 28px; border:none; border-radius:12px; font:700 clamp(.75rem,1.7vmin,.95rem) 'Inter';
+    cursor:pointer; letter-spacing:.02em; transition:transform .1s, box-shadow .15s;}
+  .btn:hover{transform:translateY(-1px);}
+  .btn-gold{background:linear-gradient(180deg,#e5c65e,#cfa93f); color:var(--ink);
+    box-shadow:0 4px 14px rgba(217,180,74,.28), inset 0 1px 0 rgba(255,255,255,.35);}
+  .btn-gold:hover{box-shadow:0 6px 18px rgba(217,180,74,.4), inset 0 1px 0 rgba(255,255,255,.35);}
+  .btn-ghost{background:transparent; color:var(--muted); border:1px solid var(--line-strong);}
+  .btn-red{background:var(--p1); color:#fff; box-shadow:0 4px 14px rgba(224,80,60,.3);}
+  .btn-row{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
+
+  .dice-row{display:flex; gap:20px;}
+  .die{width:clamp(64px,11.5vmin,100px); height:clamp(64px,11.5vmin,100px);
+    background:linear-gradient(150deg,#fdf7e8 0%,#f2e8d1 55%,#e2d3b2 100%);
+    border-radius:18%; display:grid; grid-template:repeat(3,1fr)/repeat(3,1fr);
+    padding:clamp(8px,1.5vmin,13px); gap:clamp(5px,.92vmin,8px);
+    box-shadow:0 14px 30px rgba(0,0,0,.5), 0 3px 6px rgba(0,0,0,.35),
+      inset 0 2px 2px rgba(255,255,255,.85), inset 0 -6px 10px rgba(120,95,55,.3);
+    animation:settle .4s cubic-bezier(.3,1.6,.6,1);}
+  .die.enemy{background:linear-gradient(150deg,#3d4457 0%,#2d3344 60%,#202634 100%);
+    box-shadow:0 14px 30px rgba(0,0,0,.5), 0 3px 6px rgba(0,0,0,.35),
+      inset 0 2px 2px rgba(255,255,255,.14), inset 0 -6px 10px rgba(0,0,0,.45);}
+  .die span{border-radius:50%;}
+  .die span.pip{background:radial-gradient(circle at 34% 28%, #4a4138, #171310 72%);
+    box-shadow:inset 0 2px 3px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.4);}
+  .die.enemy span.pip{background:radial-gradient(circle at 34% 28%, #fffbef, #d6c9a9 78%);
+    box-shadow:inset 0 -1px 2px rgba(0,0,0,.35);}
+  .die.rolling{animation:tumble .14s infinite;}
+  .die.idle{opacity:.35; filter:saturate(.6);}
+  @keyframes tumble{25%{transform:rotate(7deg) scale(1.06);}75%{transform:rotate(-7deg) scale(.96);}}
+  @keyframes settle{from{transform:scale(.55) rotate(-12deg); opacity:0;}}
+  .roll-total{font:600 clamp(2rem,4.6vmin,3rem)/1 'Fraunces',serif; color:var(--gold);}
+  .roll-total small{display:block; font:600 .72rem 'Inter'; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--muted); margin-top:8px;}
+
+  .stepper{display:flex; align-items:center; gap:14px;}
+  .stepper button{width:40px; height:40px; border-radius:50%; border:1px solid var(--line-strong);
+    background:var(--tile); color:var(--text); font:600 1.3rem 'Inter'; cursor:pointer;}
+  .stepper button:disabled{opacity:.3; cursor:default;}
+  .stepper .val{font:600 clamp(1.4rem,3.4vmin,2rem) 'Fraunces'; min-width:2ch;
+    font-variant-numeric:tabular-nums; color:var(--gold);}
+
+  .log{height:clamp(64px,13vmin,120px); overflow-y:auto; background:rgba(8,11,18,.55);
+    border:1px solid var(--line); border-radius:var(--r-md); padding:8px 14px;
+    font-size:clamp(.55rem,1.25vmin,.75rem); line-height:1.75; color:var(--muted);
+    -webkit-mask-image:linear-gradient(180deg,#000 78%,transparent);
+    mask-image:linear-gradient(180deg,#000 78%,transparent);}
+  .log b{font-weight:600;}
+  .log::-webkit-scrollbar{width:4px;} .log::-webkit-scrollbar-thumb{background:var(--line-strong);}
+
+  /* ---------- Overlays ---------- */
+  .overlay{position:fixed; inset:0; background:rgba(7,10,17,.84); backdrop-filter:blur(6px);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:20px;}
+  .overlay.show{display:flex;}
+  .card{background:var(--panel); border:1px solid var(--line-strong); border-radius:var(--r-lg);
+    padding:40px 44px; max-width:480px; width:100%; text-align:center;
+    box-shadow:0 32px 80px rgba(0,0,0,.6);}
+  .card h2{font-size:1.9rem; font-weight:600; margin-bottom:6px;}
+  .card .sub{color:var(--muted); font-size:.92rem; line-height:1.55; margin-bottom:24px;}
+  .card .who{display:inline-flex; align-items:center; gap:10px; padding:8px 18px;
+    background:var(--bg); border-radius:24px; border:1px solid var(--line);
+    font-weight:600; margin-bottom:20px;}
+  .card .who .dot{width:12px; height:12px; border-radius:50%;}
+
+  /* battle */
+  .battle-side{display:flex; flex-direction:column; align-items:center; gap:10px;}
+  .battle-grid{display:flex; align-items:flex-start; justify-content:center; gap:28px; margin:18px 0;}
+  .battle-side .label{font-size:.68rem; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--faint); font-weight:600;}
+  .battle-side .count{font:600 2.4rem 'Fraunces'; font-variant-numeric:tabular-nums; line-height:1;}
+  .battle-side .dice-row{gap:10px; min-height:clamp(52px,9vmin,72px);}
+  .battle-side .dice-row .die{width:clamp(52px,9vmin,72px); height:clamp(52px,9vmin,72px);
+    padding:clamp(7px,1.17vmin,9.5px); gap:clamp(4px,.72vmin,6px);}
+  .vs{font-family:'Fraunces',serif; font-style:italic; color:var(--faint); font-size:1.2rem;
+    align-self:center;}
+  .b-result{min-height:1.4em; font-size:.9rem; color:var(--muted); margin-bottom:18px;}
+  .b-result b{color:var(--text);}
+
+  .music-btn{position:fixed; top:14px; right:14px; z-index:60; padding:8px 16px;
+    background:var(--panel); color:var(--text); border:1px solid var(--line-strong);
+    border-radius:20px; font:600 .78rem 'Inter',sans-serif; cursor:pointer;
+    box-shadow:0 4px 12px rgba(0,0,0,.4); transition:opacity .15s;}
+  .music-btn.off{color:var(--faint); opacity:.6;}
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP ============ -->
+<div class="setup" id="setup">
+  <h1>Dice <em>Imperium</em></h1>
+  <p class="tag">March your army around the world. Land on a territory and seize it &mdash; but every conquest is settled by the dice.</p>
+  <label>Commanders</label>
+  <div class="count-row" id="countRow">
+    <button onclick="setCount(2)">2 players</button>
+    <button class="on" onclick="setCount(3)">3 players</button>
+    <button onclick="setCount(4)">4 players</button>
+  </div>
+  <label>Names</label>
+  <div id="nameRows"></div>
+  <div class="rules">
+    <b>How to win:</b> control <b>3 complete continents</b> (or the whole map).<br>
+    Roll two dice and march. Land on free land to garrison it, on enemy land to invade &mdash; attacker rolls up to 3 dice, defender up to 2, highest dice win, ties favor the defender. Pass <b>Command HQ</b> to collect 5 fresh troops plus a bonus for every continent you fully control. Doubles roll again; three doubles lands you in Quarantine.
+  </div>
+  <button class="big-btn" onclick="startGame()">Begin the campaign</button>
+</div>
+
+<!-- ============ GAME ============ -->
+<div id="game">
+  <div class="board" id="board"></div>
+</div>
+
+<!-- handoff / notice overlay -->
+<div class="overlay" id="ovl">
+  <div class="card" id="ovlCard"></div>
+</div>
+
+<button class="music-btn" id="musicBtn" onclick="toggleSound()">&#9834; Sound on</button>
+
+<script>
+'use strict';
+/* ================= DATA ================= */
+const CONT = {
+  na:{name:'North America', color:'var(--na)', bonus:3},
+  sa:{name:'South America', color:'var(--sa)', bonus:2},
+  eu:{name:'Europe',        color:'var(--eu)', bonus:3},
+  af:{name:'Africa',        color:'var(--af)', bonus:3},
+  as:{name:'Asia',          color:'var(--as)', bonus:4},
+  oc:{name:'Oceania',       color:'var(--oc)', bonus:2},
+};
+const TILES = [
+  {c:'corner', name:'Command HQ', sub:'Collect 5 troops + continent bonuses each lap'},
+  {c:'na', name:'Alaska'}, {c:'na', name:'Canada'}, {c:'na', name:'United States'}, {c:'na', name:'Mexico'},
+  {c:'sa', name:'Colombia'}, {c:'sa', name:'Brazil'},
+  {c:'corner', name:'Quarantine', sub:'Skip your next turn'},
+  {c:'sa', name:'Peru'}, {c:'sa', name:'Argentina'},
+  {c:'eu', name:'Britain'}, {c:'eu', name:'France'}, {c:'eu', name:'Germany'}, {c:'eu', name:'Russia'},
+  {c:'corner', name:'War Chest', sub:'Roll one die, gain that many troops'},
+  {c:'af', name:'Egypt'}, {c:'af', name:'Nigeria'}, {c:'af', name:'Congo'}, {c:'af', name:'South Africa'},
+  {c:'as', name:'India'}, {c:'as', name:'China'},
+  {c:'corner', name:'Airlift', sub:'Fly to any territory on the map'},
+  {c:'as', name:'Siberia'}, {c:'as', name:'Japan'},
+  {c:'oc', name:'Indonesia'}, {c:'oc', name:'New Guinea'}, {c:'oc', name:'Australia'}, {c:'oc', name:'New Zealand'},
+];
+const PCOLORS = ['var(--p1)','var(--p2)','var(--p3)','var(--p4)'];
+const PNAMES  = ['Crimson Legion','Azure Fleet','Golden Horde','Jade Army'];
+const START_RESERVE = 12, LAP_PAY = 5, WIN_CONTINENTS = 3;
+
+/* ================= STATE ================= */
+let nPlayers = 3;
+let players = [];        // {name,color,pos,reserve,skip}
+let owner = [], garrison = [];   // per tile
+let cur = 0, doubles = 0, lastDouble = false;
+let logLines = [];
+let stepState = {val:1,min:1,max:1};
+let battle = null;
+let airliftMode = false;
+
+/* ================= AUDIO ================= */
+const AU = {ctx:null, master:null, music:null, on:true, step:0, next:0, noise:null};
+const midiF = n => 440*Math.pow(2,(n-69)/12);
+const MSTEP = 60/92/2; // eighth notes at 92 bpm
+// 4 bars in A minor: Am / G / F / E — quiet imperial march
+const BASS = [45,0,45,0,45,0,45,0, 43,0,43,0,43,0,43,0, 41,0,41,0,41,0,41,0, 40,0,40,0,40,0,40,0];
+const MEL  = [69,0,72,0,76,0,72,0, 71,0,74,0,79,0,74,0, 72,0,76,0,81,0,79,0, 80,0,76,0,71,0,64,0];
+function audioInit(){
+  if(AU.ctx){ AU.ctx.resume(); return; }
+  const C = window.AudioContext||window.webkitAudioContext;
+  if(!C) return;
+  AU.ctx = new C();
+  AU.master = AU.ctx.createGain();
+  AU.master.gain.value = AU.on ? 1 : 0;
+  AU.master.connect(AU.ctx.destination);
+  AU.music = AU.ctx.createGain();
+  AU.music.gain.value = .55;
+  AU.music.connect(AU.master);
+  const len = AU.ctx.sampleRate*0.1, buf = AU.ctx.createBuffer(1,len,AU.ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i] = Math.random()*2-1;
+  AU.noise = buf;
+  AU.next = AU.ctx.currentTime + .1;
+  setInterval(musicTick, 30);
+}
+function tone(freq,t,dur,type,vol,dest){
+  const o = AU.ctx.createOscillator(), g = AU.ctx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(vol,t+.015);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(dest||AU.master);
+  o.start(t); o.stop(t+dur+.05);
+}
+function noiseHit(t,vol,freq,dur=.06){
+  const s = AU.ctx.createBufferSource(); s.buffer = AU.noise;
+  const f = AU.ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=freq;
+  const g = AU.ctx.createGain();
+  g.gain.setValueAtTime(vol,t);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  s.connect(f); f.connect(g); g.connect(AU.master);
+  s.start(t); s.stop(t+dur);
+}
+function musicTick(){
+  while(AU.next < AU.ctx.currentTime + .12){
+    const s = AU.step % 32, t = AU.next;
+    if(BASS[s]) tone(midiF(BASS[s]), t, MSTEP*1.8, 'triangle', .16, AU.music);
+    if(MEL[s])  tone(midiF(MEL[s]),  t, MSTEP*1.5, 'triangle', .07, AU.music);
+    if(s%8===0 || s%8===4){ // soft drum on beats 1 & 3
+      const o = AU.ctx.createOscillator(), g = AU.ctx.createGain();
+      o.type='sine'; o.frequency.setValueAtTime(105,t);
+      o.frequency.exponentialRampToValueAtTime(42,t+.12);
+      g.gain.setValueAtTime(.18,t); g.gain.exponentialRampToValueAtTime(.0001,t+.16);
+      o.connect(g); g.connect(AU.music); o.start(t); o.stop(t+.2);
+    }
+    if(s%8===2 || s%8===6) noiseHit(t,.025,6000); // brush on 2 & 4
+    AU.step++; AU.next += MSTEP;
+  }
+}
+function diceSfx(){
+  if(!AU.ctx || !AU.on) return;
+  const t0 = AU.ctx.currentTime;
+  for(let i=0;i<6;i++) noiseHit(t0 + i*.06 + Math.random()*.03, .09 - i*.01, 2500, .04);
+}
+function fanfareSfx(){
+  if(!AU.ctx || !AU.on) return;
+  const t0 = AU.ctx.currentTime;
+  [69,73,76,81].forEach((n,i)=>tone(midiF(n), t0+i*.12, .5, 'triangle', .14));
+}
+function toggleSound(){
+  AU.on = !AU.on;
+  if(!AU.ctx && AU.on) audioInit();
+  if(AU.ctx) AU.master.gain.value = AU.on ? 1 : 0;
+  const b = document.getElementById('musicBtn');
+  b.classList.toggle('off', !AU.on);
+  b.innerHTML = AU.on ? '&#9834; Sound on' : '&#9834; Sound off';
+}
+
+/* ================= SETUP UI ================= */
+function setCount(n){
+  nPlayers = n;
+  document.querySelectorAll('#countRow button').forEach((b,i)=>b.classList.toggle('on', i===n-2));
+  drawNameRows();
+}
+function drawNameRows(){
+  document.getElementById('nameRows').innerHTML = Array.from({length:nPlayers},(_,i)=>`
+    <div class="name-row">
+      <span class="dot" style="background:${PCOLORS[i]}"></span>
+      <input id="pname${i}" value="${PNAMES[i]}" maxlength="20">
+    </div>`).join('');
+}
+drawNameRows();
+
+function startGame(){
+  players = Array.from({length:nPlayers},(_,i)=>({
+    name: document.getElementById('pname'+i).value.trim() || PNAMES[i],
+    color: PCOLORS[i], pos:0, reserve:START_RESERVE, skip:false,
+  }));
+  owner = TILES.map(()=>null);
+  garrison = TILES.map(()=>0);
+  cur = 0; doubles = 0; logLines = [];
+  audioInit();
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('game').style.display = 'block';
+  buildBoard();
+  log(`The campaign begins. Each commander starts with ${START_RESERVE} troops in reserve.`);
+  startTurn();
+}
+
+/* ================= BOARD RENDER ================= */
+function gridPos(i){
+  if(i<=7)  return {r:8, c:8-i, side:'b-bottom'};
+  if(i<=13) return {r:15-i, c:1, side:'b-left'};
+  if(i<=21) return {r:1, c:i-13, side:'b-top'};
+  return {r:i-20, c:8, side:'b-right'};
+}
+function buildBoard(){
+  const b = document.getElementById('board');
+  b.innerHTML = TILES.map((t,i)=>{
+    const g = gridPos(i);
+    const corner = t.c==='corner';
+    return `<div class="tile ${g.side} ${corner?'corner':''}" id="tile${i}"
+      style="grid-row:${g.r};grid-column:${g.c}" onclick="tileClick(${i})">
+      ${corner?'':`<span class="band" style="--bc:${CONT[t.c].color}"></span>`}
+      <div class="t-name">${t.name}</div>
+      ${corner?`<div class="t-sub">${t.sub}</div>`:`<div class="t-owner" id="own${i}" style="display:none"></div>`}
+      <div class="tokens" id="tok${i}"></div>
+    </div>`;
+  }).join('') + `
+    <div class="center">
+      <div class="logo"><h1>Dice <em>Imperium</em></h1><p>conquer three continents</p></div>
+      <div class="p-row" id="pRow"></div>
+      <div class="stage" id="stage"></div>
+      <div class="log" id="logBox"></div>
+    </div>`;
+  renderBoard();
+}
+function renderBoard(){
+  TILES.forEach((t,i)=>{
+    const el = document.getElementById('tile'+i);
+    el.classList.toggle('here', players.some(p=>p.pos===i));
+    if(t.c!=='corner'){
+      const o = document.getElementById('own'+i);
+      if(owner[i]!==null){
+        o.style.display=''; o.textContent = garrison[i];
+        o.style.background = players[owner[i]].color;
+        el.style.background = `color-mix(in srgb, ${players[owner[i]].color} 13%, var(--tile))`;
+      } else { o.style.display='none'; el.style.background=''; }
+    }
+    document.getElementById('tok'+i).innerHTML =
+      players.map((p,pi)=>p.pos===i?`<span class="tok" style="background:${p.color}"></span>`:'').join('');
+  });
+  document.getElementById('pRow').innerHTML = players.map((p,i)=>{
+    const terr = owner.filter(o=>o===i).length;
+    const conts = fullContinents(i).length;
+    return `<div class="p-chip ${i===cur?'turn':''}">
+      <span class="dot" style="background:${p.color}"></span>
+      <b>${p.name}</b>&nbsp; ${p.reserve} troops · ${terr} lands${conts?` · ${conts}★`:''}
+    </div>`;
+  }).join('');
+}
+function fullContinents(pi){
+  return Object.keys(CONT).filter(k=>{
+    const tiles = TILES.map((t,i)=>t.c===k?i:-1).filter(i=>i>=0);
+    return tiles.every(i=>owner[i]===pi);
+  });
+}
+function log(msg){
+  logLines.unshift(msg);
+  logLines = logLines.slice(0,50);
+  document.getElementById('logBox').innerHTML = logLines.map(l=>`<div>${l}</div>`).join('');
+}
+function pTag(pi){ return `<b style="color:${players[pi].color}">${players[pi].name}</b>`; }
+
+/* ================= DICE ================= */
+const PIPS = {1:[5],2:[1,9],3:[1,5,9],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]};
+function dieHTML(v, enemy=false, rolling=false, idle=false){
+  return `<div class="die ${enemy?'enemy':''} ${rolling?'rolling':''} ${idle?'idle':''}">${
+    Array.from({length:9},(_,i)=>`<span class="${PIPS[v].includes(i+1)?'pip':''}"></span>`).join('')}</div>`;
+}
+const roll1 = ()=>1+Math.floor(Math.random()*6);
+
+/* ================= STAGE HELPERS ================= */
+function stage(html){ document.getElementById('stage').innerHTML = html; }
+function stepperHTML(){
+  return `<div class="stepper">
+    <button onclick="stepVal(-1)" id="stepMinus">&minus;</button>
+    <span class="val" id="stepValEl">${stepState.val}</span>
+    <button onclick="stepVal(1)" id="stepPlus">+</button>
+  </div>`;
+}
+function stepVal(d){
+  stepState.val = Math.max(stepState.min, Math.min(stepState.max, stepState.val+d));
+  document.getElementById('stepValEl').textContent = stepState.val;
+  document.getElementById('stepMinus').disabled = stepState.val<=stepState.min;
+  document.getElementById('stepPlus').disabled = stepState.val>=stepState.max;
+}
+function overlay(html){ document.getElementById('ovlCard').innerHTML = html;
+  document.getElementById('ovl').classList.add('show'); }
+function hideOverlay(){ document.getElementById('ovl').classList.remove('show'); }
+
+/* ================= TURN FLOW ================= */
+function startTurn(){
+  renderBoard();
+  const p = players[cur];
+  if(p.skip){
+    p.skip = false;
+    overlay(`<h2 class="serif">Quarantined</h2>
+      <div class="who"><span class="dot" style="background:${p.color}"></span>${p.name}</div>
+      <p class="sub">Your army sits out this turn.</p>
+      <button class="btn btn-gold" onclick="hideOverlay(); nextPlayer();">Continue</button>`);
+    log(`${pTag(cur)} is quarantined and skips the turn.`);
+    return;
+  }
+  overlay(`<h2 class="serif">Your move, commander</h2>
+    <div class="who"><span class="dot" style="background:${p.color}"></span>${p.name}</div>
+    <p class="sub">${p.reserve} troops in reserve &middot; ${owner.filter(o=>o===cur).length} territories held.<br>Pass the device, then roll.</p>
+    <button class="btn btn-gold" onclick="hideOverlay(); showRollStage();">Take the turn</button>`);
+}
+function showRollStage(extra=''){
+  stage(`${extra?`<div class="msg"><small>${extra}</small></div>`:''}
+    <div class="dice-row">${dieHTML(roll1(),false,false,true)}${dieHTML(roll1(),false,false,true)}</div>
+    <button class="btn btn-gold" onclick="doRoll()">Roll &amp; march</button>`);
+}
+async function doRoll(){
+  const d1 = roll1(), d2 = roll1();
+  diceSfx();
+  // rolling animation
+  stage(`<div class="dice-row" id="rollAnim">${dieHTML(1,false,true)}${dieHTML(1,false,true)}</div>`);
+  const anim = setInterval(()=>{
+    document.getElementById('rollAnim').innerHTML = dieHTML(roll1(),false,true)+dieHTML(roll1(),false,true);
+  }, 90);
+  await wait(700);
+  clearInterval(anim);
+  stage(`<div class="dice-row">${dieHTML(d1)}${dieHTML(d2)}</div>
+    <div class="roll-total">${d1+d2}${d1===d2?'<small>Doubles — roll again</small>':''}</div>`);
+  lastDouble = d1===d2;
+  if(lastDouble) doubles++; else doubles = 0;
+  log(`${pTag(cur)} rolls ${d1} + ${d2}${lastDouble?' — <b>doubles!</b>':''}`);
+  if(doubles>=3){
+    doubles = 0; lastDouble = false;
+    await wait(600);
+    players[cur].pos = 7; players[cur].skip = true;
+    renderBoard();
+    log(`${pTag(cur)} rolled three doubles in a row — straight to Quarantine!`);
+    stage(`<div class="msg">Three doubles in a row!<small>The military police escort you to Quarantine.</small></div>
+      <button class="btn btn-ghost" onclick="endTurn()">End turn</button>`);
+    return;
+  }
+  await wait(500);
+  await moveSteps(d1+d2);
+  resolveLanding();
+}
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+async function moveSteps(n){
+  const p = players[cur];
+  for(let s=0;s<n;s++){
+    p.pos = (p.pos+1)%28;
+    if(p.pos===0){
+      const bonus = lapBonus(cur);
+      p.reserve += bonus.total;
+      log(`${pTag(cur)} passes Command HQ: +${bonus.total} troops${bonus.note}`);
+    }
+    renderBoard();
+    await wait(130);
+  }
+}
+function lapBonus(pi){
+  const conts = fullContinents(pi);
+  const extra = conts.reduce((s,k)=>s+CONT[k].bonus,0);
+  return {total:LAP_PAY+extra, note: extra?` (${LAP_PAY} + ${extra} continent bonus)`:''};
+}
+
+/* ================= LANDING ================= */
+function resolveLanding(){
+  renderBoard();
+  const p = players[cur], i = p.pos, t = TILES[i];
+  if(t.c==='corner'){ return resolveCorner(i); }
+  const contName = CONT[t.c].name;
+  if(owner[i]===null){
+    if(p.reserve<1){
+      log(`${pTag(cur)} reaches unclaimed ${t.name} but has no reserves to garrison it.`);
+      stage(`<div class="msg">${t.name} lies unclaimed<small>No troops in reserve — you cannot garrison it.</small></div>
+        <button class="btn btn-ghost" onclick="endTurn()">End turn</button>`);
+      return;
+    }
+    stepState = {val:1,min:1,max:p.reserve};
+    stage(`<div class="msg">Claim ${t.name}<small>${contName} &middot; choose how many troops to garrison (reserve: ${p.reserve})</small></div>
+      ${stepperHTML()}
+      <div class="btn-row">
+        <button class="btn btn-gold" onclick="confirmClaim()">Plant the flag</button>
+        <button class="btn btn-ghost" onclick="log(pTag(cur)+' marches past '+TILES[players[cur].pos].name+' without claiming it.'); endTurn()">Decline</button>
+      </div>`);
+  } else if(owner[i]===cur){
+    if(p.reserve<1){
+      log(`${pTag(cur)} rests at ${t.name}.`);
+      stage(`<div class="msg">${t.name} stands firm<small>Your garrison of ${garrison[i]} holds. No reserves to add.</small></div>
+        <button class="btn btn-ghost" onclick="endTurn()">End turn</button>`);
+      return;
+    }
+    stepState = {val:0,min:0,max:p.reserve};
+    stage(`<div class="msg">Reinforce ${t.name}<small>Current garrison: ${garrison[i]} &middot; reserve: ${p.reserve}</small></div>
+      ${stepperHTML()}
+      <button class="btn btn-gold" onclick="confirmReinforce()">Deploy</button>`);
+  } else {
+    const def = owner[i];
+    if(p.reserve<1){
+      log(`${pTag(cur)} eyes ${t.name} but has no troops to invade with.`);
+      stage(`<div class="msg">${t.name} belongs to ${players[def].name}<small>No reserves — you cannot invade.</small></div>
+        <button class="btn btn-ghost" onclick="endTurn()">End turn</button>`);
+      return;
+    }
+    stepState = {val:Math.min(p.reserve,3),min:1,max:p.reserve};
+    stage(`<div class="msg">Invade ${t.name}?<small>${pTag(def)} defends with ${garrison[i]} troops &middot; commit your attack force (reserve: ${p.reserve})</small></div>
+      ${stepperHTML()}
+      <div class="btn-row">
+        <button class="btn btn-red" onclick="openBattle()">Attack</button>
+        <button class="btn btn-ghost" onclick="log(pTag(cur)+' declines to attack '+TILES[players[cur].pos].name+'.'); endTurn()">Stand down</button>
+      </div>`);
+  }
+}
+function confirmClaim(){
+  const p = players[cur], i = p.pos, n = stepState.val;
+  p.reserve -= n; owner[i] = cur; garrison[i] = n;
+  log(`${pTag(cur)} claims <b>${TILES[i].name}</b> with ${n} troop${n>1?'s':''}.`);
+  renderBoard();
+  if(!checkWin()) endTurn();
+}
+function confirmReinforce(){
+  const p = players[cur], i = p.pos, n = stepState.val;
+  p.reserve -= n; garrison[i] += n;
+  if(n>0) log(`${pTag(cur)} reinforces ${TILES[i].name} to ${garrison[i]} troops.`);
+  renderBoard(); endTurn();
+}
+
+/* ================= CORNERS ================= */
+function resolveCorner(i){
+  const p = players[cur];
+  if(i===0){
+    stage(`<div class="msg">Command HQ<small>Fresh troops collected on arrival.</small></div>
+      <button class="btn btn-ghost" onclick="endTurn()">End turn</button>`);
+  } else if(i===7){
+    p.skip = true;
+    log(`${pTag(cur)} is placed in Quarantine — next turn skipped.`);
+    stage(`<div class="msg">Quarantine<small>Your army is held for inspection. You skip your next turn.</small></div>
+      <button class="btn btn-ghost" onclick="endTurn()">End turn</button>`);
+  } else if(i===14){
+    const d = roll1();
+    p.reserve += d;
+    log(`${pTag(cur)} opens the War Chest: +${d} troops.`);
+    stage(`<div class="msg">War Chest</div><div class="dice-row">${dieHTML(d)}</div>
+      <div class="msg"><small>+${d} troops to your reserve.</small></div>
+      <button class="btn btn-ghost" onclick="renderBoard(); endTurn()">End turn</button>`);
+  } else {
+    airliftMode = true;
+    log(`${pTag(cur)} boards the Airlift.`);
+    stage(`<div class="msg">Airlift<small>Choose any territory on the board — tap a tile to fly there.</small></div>`);
+    TILES.forEach((t,ti)=>{
+      if(t.c!=='corner') document.getElementById('tile'+ti).classList.add('pickable');
+    });
+  }
+}
+function tileClick(i){
+  if(!airliftMode || TILES[i].c==='corner') return;
+  airliftMode = false;
+  TILES.forEach((_,ti)=>document.getElementById('tile'+ti).classList.remove('pickable'));
+  players[cur].pos = i;
+  log(`${pTag(cur)} airlifts into ${TILES[i].name}.`);
+  resolveLanding();
+}
+
+/* ================= BATTLE ================= */
+function openBattle(){
+  const p = players[cur], i = p.pos;
+  battle = {tile:i, atk:stepState.val, def:garrison[i], defPl:owner[i]};
+  p.reserve -= battle.atk;
+  log(`${pTag(cur)} invades <b>${TILES[i].name}</b> with ${battle.atk} troops against ${battle.def} defenders!`);
+  drawBattle('The armies face each other across the border.');
+}
+function drawBattle(result, done=false, aDice=[], dDice=[]){
+  const b = battle, t = TILES[b.tile];
+  overlay(`<h2 class="serif">Battle for ${t.name}</h2>
+    <p class="sub">${CONT[t.c].name}</p>
+    <div class="battle-grid">
+      <div class="battle-side">
+        <span class="label" style="color:${players[cur].color}">${players[cur].name}</span>
+        <span class="count" style="color:${players[cur].color}">${b.atk}</span>
+        <div class="dice-row">${aDice.map(v=>dieHTML(v)).join('')}</div>
+      </div>
+      <span class="vs">vs</span>
+      <div class="battle-side">
+        <span class="label" style="color:${players[b.defPl].color}">${players[b.defPl].name}</span>
+        <span class="count" style="color:${players[b.defPl].color}">${b.def}</span>
+        <div class="dice-row">${dDice.map(v=>dieHTML(v,true)).join('')}</div>
+      </div>
+    </div>
+    <div class="b-result">${result}</div>
+    ${done
+      ? `<button class="btn btn-gold" onclick="closeBattle()">Continue</button>`
+      : `<div class="btn-row">
+          <button class="btn btn-red" onclick="battleRound()">Roll the dice</button>
+          <button class="btn btn-ghost" onclick="retreat()">Retreat</button>
+        </div>`}
+  `);
+}
+function battleRound(){
+  diceSfx();
+  const b = battle;
+  const aN = Math.min(3,b.atk), dN = Math.min(2,b.def);
+  const aR = Array.from({length:aN},roll1).sort((x,y)=>y-x);
+  const dR = Array.from({length:dN},roll1).sort((x,y)=>y-x);
+  let aLoss=0,dLoss=0;
+  for(let i=0;i<Math.min(aN,dN);i++) (aR[i]>dR[i]) ? dLoss++ : aLoss++;
+  b.atk -= aLoss; b.def -= dLoss;
+  const parts = [];
+  if(dLoss) parts.push(`defender loses <b>${dLoss}</b>`);
+  if(aLoss) parts.push(`attacker loses <b>${aLoss}</b>`);
+  const result = parts.join(', ')+'.';
+  if(b.def<=0){
+    // conquered
+    const prev = b.defPl;
+    owner[b.tile] = cur; garrison[b.tile] = b.atk;
+    log(`${pTag(cur)} <b>conquers ${TILES[b.tile].name}</b>! ${b.atk} troop${b.atk>1?'s':''} occupy it.`);
+    fanfareSfx();
+    b.won = true;
+    drawBattle(`${result} <b style="color:${players[cur].color}">The territory falls!</b>`, true, aR, dR);
+  } else if(b.atk<=0){
+    log(`${pTag(cur)}'s invasion of ${TILES[b.tile].name} is crushed. ${b.def} defenders remain.`);
+    garrison[b.tile] = b.def;
+    b.won = false;
+    drawBattle(`${result} <b style="color:${players[b.defPl].color}">The invasion is repelled.</b>`, true, aR, dR);
+  } else {
+    garrison[b.tile] = b.def;
+    drawBattle(result, false, aR, dR);
+  }
+}
+function retreat(){
+  players[cur].reserve += battle.atk;
+  garrison[battle.tile] = battle.def;
+  log(`${pTag(cur)} retreats from ${TILES[battle.tile].name} with ${battle.atk} troops.`);
+  battle.won = false;
+  hideOverlay(); battle = null;
+  renderBoard(); endTurn();
+}
+function closeBattle(){
+  hideOverlay();
+  const won = battle && battle.won;
+  battle = null;
+  renderBoard();
+  if(won && checkWin()) return;
+  endTurn();
+}
+
+/* ================= WIN / NEXT ================= */
+function checkWin(){
+  const conts = fullContinents(cur);
+  const terr = owner.filter(o=>o===cur).length;
+  if(conts.length>=WIN_CONTINENTS || terr===24){
+    fanfareSfx();
+    const p = players[cur];
+    overlay(`<h2 class="serif" style="color:var(--gold)">Victory</h2>
+      <div class="who"><span class="dot" style="background:${p.color}"></span>${p.name}</div>
+      <p class="sub">${terr===24 ? 'The entire world kneels before your empire.'
+        : `You command ${conts.map(k=>CONT[k].name).join(', ')} — three continents united under one banner.`}</p>
+      <button class="btn btn-gold" onclick="location.reload()">Play again</button>`);
+    log(`<b style="color:var(--gold)">${players[cur].name} wins the campaign!</b>`);
+    return true;
+  }
+  return false;
+}
+function endTurn(){
+  if(lastDouble){
+    lastDouble = false;
+    log(`${pTag(cur)} rolls again for doubles.`);
+    showRollStage('Doubles — roll again!');
+    return;
+  }
+  nextPlayer();
+}
+function nextPlayer(){
+  doubles = 0; lastDouble = false;
+  cur = (cur+1)%players.length;
+  startTurn();
+}
+</script>
+</body>
+</html>
